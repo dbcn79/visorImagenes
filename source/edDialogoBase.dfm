@@ -1,0 +1,99 @@
+object frmDialogoBase: TfrmDialogoBase
+  Left = 366
+  Top = 555
+  BorderIcons = []
+  BorderStyle = bsToolWindow
+  ClientHeight = 217
+  ClientWidth = 324
+  Color = clWhite
+  Ctl3D = False
+  ParentFont = True
+  Menu = MainMenu1
+  OldCreateOrder = True
+  Position = poScreenCenter
+  OnCreate = FormCreate
+  PixelsPerInch = 96
+  TextHeight = 13
+  object lblInformacion: TPanel
+    Left = 0
+    Top = 0
+    Width = 324
+    Height = 25
+    Margins.Left = 0
+    Margins.Top = 0
+    Margins.Right = 0
+    Margins.Bottom = 0
+    Align = alTop
+    BevelEdges = [beBottom]
+    BevelInner = bvSpace
+    BevelOuter = bvNone
+    Ctl3D = True
+    ParentBackground = False
+    ParentCtl3D = False
+    TabOrder = 0
+  end
+  object Panel1: TPanel
+    Left = 0
+    Top = 192
+    Width = 324
+    Height = 25
+    Margins.Left = 0
+    Margins.Top = 0
+    Margins.Right = 0
+    Margins.Bottom = 0
+    Align = alBottom
+    BevelEdges = [beTop]
+    BevelInner = bvSpace
+    BevelOuter = bvNone
+    Ctl3D = True
+    ParentBackground = False
+    ParentCtl3D = False
+    TabOrder = 1
+  end
+  object Panel2: TPanel
+    Left = 0
+    Top = 25
+    Width = 324
+    Height = 167
+    Margins.Left = 0
+    Margins.Top = 0
+    Margins.Right = 0
+    Margins.Bottom = 0
+    Align = alClient
+    BevelEdges = []
+    BevelOuter = bvNone
+    Color = clWhite
+    Ctl3D = True
+    ParentBackground = False
+    ParentCtl3D = False
+    TabOrder = 2
+    object btnAceptar: TcxButton
+      Left = 220
+      Top = 107
+      Width = 93
+      Height = 29
+      Caption = 'Aceptar'
+      LookAndFeel.Kind = lfUltraFlat
+      ModalResult = 1
+      OptionsImage.ImageIndex = 270
+      TabOrder = 0
+      OnClick = AceptarClick
+    end
+  end
+  object MainMenu1: TMainMenu
+    Left = 268
+    Top = 72
+    object N1: TMenuItem
+      Visible = False
+      object Aceptar: TMenuItem
+        Visible = False
+        OnClick = AceptarClick
+      end
+      object Salir: TMenuItem
+        ShortCut = 27
+        Visible = False
+        OnClick = SalirClick
+      end
+    end
+  end
+end

@@ -1,0 +1,22 @@
+0	 (i)  Log subsystem started in elapsed time mode.
+0	 (i)  Logging [debug info (D), info (i), notices (M), warnings (W), errors (Er), fatal errors (!!)]
+0	 (i)  Buffered mode: False
+0	 (i)  Temporary rendering context created
+0	 (M)  Getting OpenGL entry points and extension
+0	 (M)  
+0	 (i)  OpenGL rendering context information:
+0	 (i)  Renderer     : GDI Generic
+0	 (i)  Vendor       : Microsoft Corporation
+0	 (i)  Version      : 1.1.0
+0	 (W)  GLSL version : not supported
+0	 (M)  
+0	 (i)  Temporary rendering context destroyed
+0	 (W)  Unable to create rendering context with hardware acceleration - down to software
+0	 (M)  Getting OpenGL entry points and extension
+469	 (i)  Temporary rendering context created
+469	 (M)  Getting OpenGL entry points and extension
+469	 (i)  Temporary rendering context destroyed
+469	 (W)  Unable to create rendering context with hardware acceleration - down to software
+469	 (M)  Getting OpenGL entry points and extension
+127127750	 (i)  Logged fatal_errors: 0, errors: 0, warnings: 3, notices: 6, info: 11, debug: 0
+127127766	 (i)  Log session shutdown
