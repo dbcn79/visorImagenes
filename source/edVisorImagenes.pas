@@ -178,31 +178,31 @@ begin
   if DM.FTipoBusqueda = tbPorPaciente then begin
     FSQL := FSQL + '  and i.IdPac = :IDPAC';
   end else begin
-    if FCodigoTipoImagen <> Null then
+    if not VarIsNull(FCodigoTipoImagen) then
       FSQL := FSQL + '  and it.IdTipoImg in (' + FCodigoTipoImagen + ')'
     else
       FSQL := FSQL + '  and it.IdTipoImg = -1';
-    if (FFecCatalogDesde <> Null) and (FFecCatalogHasta = Null) then begin
+    if (not VarIsNull(FFecCatalogDesde)) and (VarIsNull(FFecCatalogHasta)) then begin
       FSQL := FSQL + '  and i.FecCatalog >= :FECCATALOGDESDE';
     end;
-    if (FFecCatalogDesde = Null) and (FFecCatalogHasta <> Null) then begin
+    if (VarIsNull(FFecCatalogDesde)) and (not VarIsNull(FFecCatalogHasta)) then begin
       FSQL := FSQL + '  and i.FecCatalog <= :FECCATALOGHASTA';
     end;
-    if (FFecCatalogDesde <> Null) and (FFecCatalogHasta <> Null) then begin
+    if (not VarIsNull(FFecCatalogDesde)) and (not VarIsNull(FFecCatalogHasta)) then begin
       FSQL := FSQL + '  and i.FecCatalog >= :FECCATALOGDESDE and i.FecCatalog <= :FECCATALOGHASTA';
     end;
-    if (FFecImportaDesde <> Null) and (FFecImportaHasta = Null) then begin
+    if (not VarIsNull(FFecImportaDesde)) and (VarIsNull(FFecImportaHasta)) then begin
       FSQL := FSQL + '  and i.FecImporta >= :FECIMPORTADESDE';
     end;
-    if (FFecImportaDesde = Null) and (FFecImportaHasta <> Null) then begin
+    if (VarIsNull(FFecImportaDesde)) and (not VarIsNull(FFecImportaHasta)) then begin
       FSQL := FSQL + '  and i.FecImporta <= :FECIMPORTAHASTA';
     end;
-    if (FFecImportaDesde <> Null) and (FFecImportaHasta <> Null) then begin
+    if (not VarIsNull(FFecImportaDesde)) and (not VarIsNull(FFecImportaHasta)) then begin
       FSQL := FSQL + '  and i.FecImporta >= :FECIMPORTADESDE and i.FecImporta <= :FECIMPORTAHASTA';
     end;
   end;
 
-  FSQL := FSQL + '  and isnull(i.IdFormato, 0) in (0, 2) '; // Sólo las JPG y DICOM
+  FSQL := FSQL + '  and isnull(i.IdFormato, 0) in (0, 2) '; // SÃ³lo las JPG y DICOM
   if DM.FTipoBusqueda = tbPorPaciente then begin
     FSQL := FSQL + 'order by i.FecImporta desc, i.HorImporta desc';
   end else begin
@@ -456,16 +456,16 @@ var puedoContinuar: Boolean;
 begin
   inherited;
   puedoContinuar := False;
-  if((FFecCatalogDesde <> Null) and (FFecCatalogHasta = Null)) or ((FFecCatalogDesde = Null) and (FFecCatalogHasta <> Null)) or ((FFecCatalogDesde <> Null) and (FFecCatalogHasta <> Null)) then
+  if((not VarIsNull(FFecCatalogDesde)) and (VarIsNull(FFecCatalogHasta))) or ((VarIsNull(FFecCatalogDesde)) and (not VarIsNull(FFecCatalogHasta))) or ((not VarIsNull(FFecCatalogDesde)) and (not VarIsNull(FFecCatalogHasta))) then
     puedoContinuar := True;
 
-  if (puedoContinuar) and ((FFecImportaDesde <> Null) and (FFecImportaHasta = Null)) or ((FFecImportaDesde = Null) and (FFecImportaHasta <> Null)) or ((FFecImportaDesde <> Null) and (FFecImportaHasta <> Null)) then
+  if (puedoContinuar) and ((not VarIsNull(FFecImportaDesde)) and (VarIsNull(FFecImportaHasta))) or ((VarIsNull(FFecImportaDesde)) and (not VarIsNull(FFecImportaHasta))) or ((not VarIsNull(FFecImportaDesde)) and (not VarIsNull(FFecImportaHasta))) then
     puedoContinuar := True;
   if puedoContinuar then begin
     visualizarNumPac := True;
     RefrescarDatos;
   end else begin
-    MessageDlg('Por motivos de rendimiento, es obligatorio seleccionar alguna de las fechas de Importación o Catalogación!', mtWarning, [mbOk], 0);
+    MessageDlg('Por motivos de rendimiento, es obligatorio seleccionar alguna de las fechas de ImportaciÃ³n o CatalogaciÃ³n!', mtWarning, [mbOk], 0);
   end;
 end;
 
@@ -473,7 +473,7 @@ procedure TfrmVisorImagenes.cbTiposImagenPropertiesChange(Sender: TObject);
 begin
   inherited;
   FCodigoTipoImagen := DM.DameCodigosSeleccionados(cbTiposImagen);
-  deCatalogacionDesde.Enabled := (FCodigoTipoImagen <> Null);
+  deCatalogacionDesde.Enabled := (not VarIsNull(FCodigoTipoImagen));
   deCatalogacionHasta.Enabled := deCatalogacionDesde.Enabled;
   deImportacionDesde.Enabled  := deCatalogacionDesde.Enabled;
   deImportacionHasta.Enabled  := deCatalogacionDesde.Enabled;
@@ -531,27 +531,30 @@ begin
 end;
 
 procedure TfrmVisorImagenes.EditarImagen;
-var rowActual: Integer; frmEdicionImagen: TfrmEdicionImagen;
+var
+  frmEdicionImagen: TfrmEdicionImagen;
 begin
   frmEdicionImagen := TfrmEdicionImagen.Create(Self);
-  frmEdicionImagen.CargarCombos;
-  frmEdicionImagen.PasarDatosImagen;
-  if frmEdicionImagen.ShowModal = mrOk then begin
-    frmEdicionImagen.ScreenToObject;
-    frmEdicionImagen.Free;
-
-    DM.FImagen.guardarImagen;
-    if TdxMemData(dsListado.DataSet).Locate('IdImg', DM.FImagen.idImg, []) then begin
-      TdxMemData(dsListado.DataSet).Edit;
-      TdxMemData(dsListado.DataSet).FieldByName('FecCatalog').Value := DM.FImagen.fecCatalog;
-      TdxMemData(dsListado.DataSet).FieldByName('FecImporta').Value := DM.FImagen.fecImporta;
-      TdxMemData(dsListado.DataSet).FieldByName('HorImporta').Value := DM.FImagen.horImporta;
-      TdxMemData(dsListado.DataSet).FieldByName('DescFuente').Value := DM.FImagen.descFuente;
-      TdxMemData(dsListado.DataSet).FieldByName('TIPOSIMAGEN').AsString := DameTiposImagen(DM.FImagen.idImg);
-      TdxMemData(dsListado.DataSet).Post;
-      TdxMemData(dsListado.DataSet).Refresh;
+  try
+    frmEdicionImagen.CargarCombos;
+    frmEdicionImagen.PasarDatosImagen;
+    if frmEdicionImagen.ShowModal = mrOk then
+    begin
+      frmEdicionImagen.ScreenToObject;
+      DM.FImagen.guardarImagen;
+      if TdxMemData(dsListado.DataSet).Locate('IdImg', DM.FImagen.idImg, []) then
+      begin
+        TdxMemData(dsListado.DataSet).Edit;
+        TdxMemData(dsListado.DataSet).FieldByName('FecCatalog').Value := DM.FImagen.fecCatalog;
+        TdxMemData(dsListado.DataSet).FieldByName('FecImporta').Value := DM.FImagen.fecImporta;
+        TdxMemData(dsListado.DataSet).FieldByName('HorImporta').Value := DM.FImagen.horImporta;
+        TdxMemData(dsListado.DataSet).FieldByName('DescFuente').Value := DM.FImagen.descFuente;
+        TdxMemData(dsListado.DataSet).FieldByName('TIPOSIMAGEN').AsString := DameTiposImagen(DM.FImagen.idImg);
+        TdxMemData(dsListado.DataSet).Post;
+        TdxMemData(dsListado.DataSet).Refresh;
+      end;
     end;
-  end else begin
+  finally
     frmEdicionImagen.Free;
   end;
 end;
@@ -559,7 +562,7 @@ end;
 procedure TfrmVisorImagenes.actEliminarImagenExecute(Sender: TObject);
 begin
   inherited;
-  if MessageDlg('¿Desea eliminar la imagen seleccionada?', mtConfirmation, [MbYes, MbNo], 0) = mrYes then begin
+  if MessageDlg('Â¿Desea eliminar la imagen seleccionada?', mtConfirmation, [MbYes, MbNo], 0) = mrYes then begin
     DM.FImagen.idImg          := dsListado.DataSet.FieldByName('IdImg').AsInteger;
     DM.FImagen.nombreImagen   := DameNombreImagen(DM.FImagen.idImg);
     DM.FImagen.nombreImagenTh := DameNombreImagenTh(DM.FImagen.idImg);
