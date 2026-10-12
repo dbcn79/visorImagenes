@@ -101,8 +101,8 @@ procedure TfrmSeleccionImagenes.FormCreate(Sender: TObject);
 begin
   CargarCombos;
   // Separar los ficheros temporales de ejecuciones distintas.
-  directorioTemporal := IncludeTrailingBackslash(GetTempDir + 'Presentacion\\' +
-    IntToStr(GetCurrentProcessId) + '\\' + DM.FPaciente.idPac.ToString);
+  directorioTemporal := IncludeTrailingBackslash(GetTempDir + 'Presentacion\' +
+    IntToStr(GetCurrentProcessId) + '\' + DM.FPaciente.idPac.ToString);
   if not ForceDirectories(directorioTemporal) then
     raise Exception.Create('No se pudo crear la carpeta temporal de presentacion');
   FFecImportaDesde  := Null;
@@ -151,6 +151,10 @@ begin
   try
     qGenerica.SQL.Add(DameSQL);
     qGenerica.ParamByName('IDPAC').AsInteger := DM.FPaciente.idPac;
+    if Assigned(qGenerica.Params.FindParam('IDFUENTE')) then
+      qGenerica.ParamByName('IDFUENTE').AsInteger := FCodigoFuente;
+    if Assigned(qGenerica.Params.FindParam('IDZONA')) then
+      qGenerica.ParamByName('IDZONA').AsInteger := FCodigoZona;
     if Assigned(qGenerica.Params.FindParam('FECIMPORTADESDE')) then
       qGenerica.ParamByName('FECIMPORTADESDE').Value := FFecImportaDesde;
     if Assigned(qGenerica.Params.FindParam('FECIMPORTAHASTA')) then
@@ -206,9 +210,9 @@ begin
     if not VarIsNull(FCodigoTipoImagen) then
       Result := Result + '  and it.IdTipoImg in (' + FCodigoTipoImagen + ')';
     if not VarIsNull(FCodigoFuente) then
-      Result := Result + '  and i.IdFuente = ' + FCodigoFuente.ToString;
+      Result := Result + '  and i.IdFuente = :IDFUENTE';
     if not VarIsNull(FCodigoZona) then
-      Result := Result + '  and i.IdZona = ' + FCodigoZona.ToString;
+      Result := Result + '  and i.IdZona = :IDZONA';
 
   Result := Result + '  and isnull(i.IdFormato, 0) in (0, 2) '; // Sólo las JPG y DICOM
   Result := Result + 'order by i.IdPac, i.FecImporta desc, i.HorImporta desc';
