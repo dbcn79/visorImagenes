@@ -118,7 +118,7 @@ end;
 
 procedure TfrmPrincipal.miAccionSalirExecute(Sender: TObject);
 begin
-  if MessageDlg('¿Desea salir de la aplicación?', mtConfirmation, mbOkCancel, 0) = mrOk then begin
+  if MessageDlg('Â¿Desea salir de la aplicaciÃ³n?', mtConfirmation, mbOkCancel, 0) = mrOk then begin
     DM.DesconectarBaseDatosGesimag;
     Close;
   end;
@@ -153,9 +153,12 @@ begin
     frmHistorialPaciente.Inicializar;
     frmHistorialPaciente.CargarHistorial;
     frmHistorialPaciente.ShowModal;
-    BorrarCarpeta(frmHistorialPaciente.directorioTemporal);
   finally
-    frmHistorialPaciente.Free;
+    try
+      BorrarCarpeta(frmHistorialPaciente.directorioTemporal);
+    finally
+      frmHistorialPaciente.Free;
+    end;
   end;
 end;
 
@@ -193,9 +196,12 @@ begin
   frmSeleccionImagenes := TfrmSeleccionImagenes.Create(Self);
   try
     frmSeleccionImagenes.ShowModal;
-    BorrarCarpeta(frmSeleccionImagenes.directorioTemporal);
   finally
-    frmSeleccionImagenes.Free;
+    try
+      BorrarCarpeta(frmSeleccionImagenes.directorioTemporal);
+    finally
+      frmSeleccionImagenes.Free;
+    end;
   end;
 end;
 
@@ -205,7 +211,11 @@ begin
 
   if VisorImagenes = nil then begin
     // Conectamos con la base de datos
-    DM.ConectarBaseDatosGesimag;
+    if not DM.ConectarBaseDatosGesimag then
+    begin
+      Application.Terminate;
+      Exit;
+    end;
     // Creamos la tabla Img_TTipoImagen
     DM.CrearTablaTTipoImg;
     // Creamos el campo Activo en las tablas TTipoImg, TTipoPlt y TZona

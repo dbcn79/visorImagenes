@@ -1,0 +1,35 @@
+# Delphi / RAD Studio build output
+*.dcu
+*.dcp
+*.bpl
+*.exe
+*.dll
+*.map
+*.rsm
+*.tds
+*.identcache
+*.dproj.local
+*.local
+*.stat
+*.otares
+*.~*
+*.bak
+*.log
+__history/
+Win32/
+Win64/
+Debug/
+Release/
+
+# Local secrets, patient data, and images
+*.config
+IMCONECT.ini
+*.gkc
+*.jpg
+*.jpeg
+*.png
+*.dcm
+*.dicom
+.env
+.env.*
+!.env.example

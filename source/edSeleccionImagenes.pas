@@ -100,9 +100,11 @@ uses Data, edPresentacionImagenes, edFuncionesImagen;
 procedure TfrmSeleccionImagenes.FormCreate(Sender: TObject);
 begin
   CargarCombos;
-  directorioTemporal := IncludeTrailingBackslash(IncludeTrailingBackslash(GetTempDir) + 'Presentacion');
-  directorioTemporal := IncludeTrailingBackslash(directorioTemporal + DM.FPaciente.idPac.ToString);
-  ForceDirectories(directorioTemporal);
+  // Separar los ficheros temporales de ejecuciones distintas.
+  directorioTemporal := IncludeTrailingBackslash(GetTempDir + 'Presentacion\' +
+    IntToStr(GetCurrentProcessId) + '\' + DM.FPaciente.idPac.ToString);
+  if not ForceDirectories(directorioTemporal) then
+    raise Exception.Create('No se pudo crear la carpeta temporal de presentacion');
   FFecImportaDesde  := Null;
   FFecImportaHasta  := Null;
   FCodigoTipoImagen := Null;
@@ -120,14 +122,15 @@ begin
   FVistaFuente.Free;
   FRepositoryZona.Free;
   FRepositoryFuente.Free;
+  inherited;
 end;
 
 procedure TfrmSeleccionImagenes.CargarCombos;
 begin
   DM.CarregaDades(SQL_ZONA, FRepositoryZona, FVistaZona, FqZona, FdsZona, cbZona,
-                  ['CODIGO', 'DESCRIPCIO'], ['Código', 'Zona'], [False, True], [0, 0], [], [], 'DESCRIPCIO', False);
+                  ['CODIGO', 'DESCRIPCIO'], ['CÃ³digo', 'Zona'], [False, True], [0, 0], [], [], 'DESCRIPCIO', False);
   DM.CarregaDades(SQL_FUENTE, FRepositoryFuente, FVistaFuente, FqFuente, FdsFuente, cbFuente,
-                  ['CODIGO', 'DESCRIPCIO'], ['Código', 'Fuente'], [False, True], [0, 0], [], [], 'DESCRIPCIO', False);
+                  ['CODIGO', 'DESCRIPCIO'], ['CÃ³digo', 'Fuente'], [False, True], [0, 0], [], [], 'DESCRIPCIO', False);
   DM.CarregaCheckComboBox(SQL_TIPOS_IMAGEN, cbTiposImagen, ['Descripcion']);
 end;
 
@@ -138,32 +141,44 @@ begin
 end;
 
 procedure TfrmSeleccionImagenes.btnAceptarClick(Sender: TObject);
-var qGenerica: TFDQuery; nombreImagen: string;
+var
+  qGenerica: TFDQuery;
+  nombreImagen: string;
+  TotalCopiadas: Integer;
 begin
+  TotalCopiadas := 0;
   DM.CrearQuery(DM.ConexionGesimag, qGenerica);
   try
     qGenerica.SQL.Add(DameSQL);
-    qGenerica.ParamByName('IDPAC').Value := DM.FPaciente.idPac;
-    if Assigned(qGenerica.Params.FindParam('FECIMPORTADESDE')) then begin
+    qGenerica.ParamByName('IDPAC').AsInteger := DM.FPaciente.idPac;
+    if Assigned(qGenerica.Params.FindParam('IDFUENTE')) then
+      qGenerica.ParamByName('IDFUENTE').AsInteger := FCodigoFuente;
+    if Assigned(qGenerica.Params.FindParam('IDZONA')) then
+      qGenerica.ParamByName('IDZONA').AsInteger := FCodigoZona;
+    if Assigned(qGenerica.Params.FindParam('FECIMPORTADESDE')) then
       qGenerica.ParamByName('FECIMPORTADESDE').Value := FFecImportaDesde;
-    end;
-    if Assigned(qGenerica.Params.FindParam('FECIMPORTAHASTA')) then begin
+    if Assigned(qGenerica.Params.FindParam('FECIMPORTAHASTA')) then
       qGenerica.ParamByName('FECIMPORTAHASTA').Value := FFecImportaHasta;
-    end;
     qGenerica.Open;
-    while not qGenerica.Eof do begin
+    while not qGenerica.Eof do
+    begin
       nombreImagen := DameNombreImagen(qGenerica.FieldByName('IdImg').AsInteger);
-      CopyFile(PChar(nombreImagen), PChar(directorioTemporal + ExtractFileName(nombreImagen)), True);
+      if not CopyFile(PChar(nombreImagen),
+                      PChar(directorioTemporal + ExtractFileName(nombreImagen)), True) then
+        raise Exception.Create('No se pudo copiar la imagen para la presentacion: ' +
+          ExtractFileName(nombreImagen));
+      Inc(TotalCopiadas);
       qGenerica.Next;
     end;
   finally
-    if qGenerica.RecordCount > 1 then begin
-      PresentarImagenes;
-    end else begin
-      MessageDlg('La presentación debe de contemplar más de una imagen', mtInformation, [mbOk], 0);
-    end;
     DM.DestruirQuery(qGenerica);
   end;
+
+  if TotalCopiadas > 1 then
+    PresentarImagenes
+  else
+    MessageDlg('La presentacion debe contener mas de una imagen',
+      mtInformation, [mbOk], 0);
 end;
 
 function TfrmSeleccionImagenes.DameSQL: string;
@@ -183,23 +198,23 @@ begin
             'where i.idimg > 0' +
             '  and i.IdPac = :IDPAC';
 
-    if (FFecImportaDesde <> Null) and (FFecImportaHasta = Null) then begin
+    if (not VarIsNull(FFecImportaDesde)) and (VarIsNull(FFecImportaHasta)) then begin
       Result := Result + '  and i.FecImporta >= :FECIMPORTADESDE';
     end;
-    if (FFecImportaDesde = Null) and (FFecImportaHasta <> Null) then begin
+    if (VarIsNull(FFecImportaDesde)) and (not VarIsNull(FFecImportaHasta)) then begin
       Result := Result + '  and i.FecImporta <= :FECIMPORTAHASTA';
     end;
-    if (FFecImportaDesde <> Null) and (FFecImportaHasta <> Null) then begin
+    if (not VarIsNull(FFecImportaDesde)) and (not VarIsNull(FFecImportaHasta)) then begin
       Result := Result + '  and i.FecImporta >= :FECIMPORTADESDE and i.FecImporta <= :FECIMPORTAHASTA';
     end;
-    if FCodigoTipoImagen <> Null then
+    if not VarIsNull(FCodigoTipoImagen) then
       Result := Result + '  and it.IdTipoImg in (' + FCodigoTipoImagen + ')';
-    if FCodigoFuente <> Null then
-      Result := Result + '  and i.IdFuente = ' + FCodigoFuente.ToString;
-    if FCodigoZona <> Null then
-      Result := Result + '  and i.IdZona = ' + FCodigoZona.ToString;
+    if not VarIsNull(FCodigoFuente) then
+      Result := Result + '  and i.IdFuente = :IDFUENTE';
+    if not VarIsNull(FCodigoZona) then
+      Result := Result + '  and i.IdZona = :IDZONA';
 
-  Result := Result + '  and isnull(i.IdFormato, 0) in (0, 2) '; // Sólo las JPG y DICOM
+  Result := Result + '  and isnull(i.IdFormato, 0) in (0, 2) '; // SÃ³lo las JPG y DICOM
   Result := Result + 'order by i.IdPac, i.FecImporta desc, i.HorImporta desc';
 end;
 
@@ -207,14 +222,17 @@ procedure TfrmSeleccionImagenes.PresentarImagenes;
 var frmPresentacionImagenes: TfrmPresentacionImagenes;
 begin
   frmPresentacionImagenes := TfrmPresentacionImagenes.Create(Self);
-  frmPresentacionImagenes.style := cbEstilos.EditValue;
-  frmPresentacionImagenes.delay := seProgressDelay.Value;
-  frmPresentacionImagenes.step  := seProgressStep.Value;
-  frmPresentacionImagenes.CreateImageList(directorioTemporal);
-  frmPresentacionImagenes.InicializarValores;
-  frmPresentacionImagenes.WindowState := wsMaximized;
-  frmPresentacionImagenes.ShowModal;
-  frmPresentacionImagenes.Free;
+  try
+    frmPresentacionImagenes.style := cbEstilos.EditValue;
+    frmPresentacionImagenes.delay := seProgressDelay.Value;
+    frmPresentacionImagenes.step  := seProgressStep.Value;
+    frmPresentacionImagenes.CreateImageList(directorioTemporal);
+    frmPresentacionImagenes.InicializarValores;
+    frmPresentacionImagenes.WindowState := wsMaximized;
+    frmPresentacionImagenes.ShowModal;
+  finally
+    frmPresentacionImagenes.Free;
+  end;
 end;
 
 procedure TfrmSeleccionImagenes.deDesdePropertiesEditValueChanged(Sender: TObject);

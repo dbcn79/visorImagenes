@@ -30,6 +30,5 @@ begin
   Application.MainFormOnTaskbar := True;
   Application.CreateForm(TDM, DM);
   Application.CreateForm(TfrmPrincipal, frmPrincipal);
-  Application.CreateForm(TfrmHistorialPaciente, frmHistorialPaciente);
   Application.Run;
 end.

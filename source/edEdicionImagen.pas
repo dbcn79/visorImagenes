@@ -117,16 +117,17 @@ begin
   FRepositoryZona.Free;
   FRepositoryFuente.Free;
   FRepositoryEspecialidad.Free;
+  inherited;
 end;
 
 procedure TfrmEdicionImagen.CargarCombos;
 begin
   DM.CarregaDades(SQL_ZONA, FRepositoryZona, FVistaZona, FqZona, FdsZona, cbZona,
-                  ['CODIGO', 'DESCRIPCIO'], ['C骴igo', 'Zona'], [False, True], [0, 0], [], [], 'DESCRIPCIO', False);
+                  ['CODIGO', 'DESCRIPCIO'], ['C贸digo', 'Zona'], [False, True], [0, 0], [], [], 'DESCRIPCIO', False);
   DM.CarregaDades(SQL_FUENTE, FRepositoryFuente, FVistaFuente, FqFuente, FdsFuente, cbFuente,
-                  ['CODIGO', 'DESCRIPCIO'], ['C骴igo', 'Fuente'], [False, True], [0, 0], [], [], 'DESCRIPCIO', False);
+                  ['CODIGO', 'DESCRIPCIO'], ['C贸digo', 'Fuente'], [False, True], [0, 0], [], [], 'DESCRIPCIO', False);
   DM.CarregaDades(SQL_ESPECIALIDAD, FRepositoryEspecialidad, FVistaEspecialidad, FqEspecialidad, FdsEspecialidad, cbEspec,
-                  ['CODIGO', 'DESCRIPCIO'], ['C骴igo', 'Especialidad'], [False, True], [0, 0], [], [], 'DESCRIPCIO', False);
+                  ['CODIGO', 'DESCRIPCIO'], ['C贸digo', 'Especialidad'], [False, True], [0, 0], [], [], 'DESCRIPCIO', False);
 
   RellenarCheckListBoxTiposImagenes;
 end;
@@ -174,7 +175,7 @@ begin
     eiEditar  : begin
                   txtDESCRIPCION.EditValue := DM.FImagen.descripcion;
                   txtIMAGEN.EditValue      := LPad(DM.FImagen.idImg.ToString, 8 - Length(DM.FImagen.idImg.ToString), '0') + '.jpg';
-                  Self.Caption             := 'Edici髇 Imagen ' + txtIMAGEN.EditValue;
+                  Self.Caption             := 'Edici贸n Imagen ' + txtIMAGEN.EditValue;
                 end;
   end;
   txtPACIENTE.EditValue    := DM.FImagen.nombrePaciente;
