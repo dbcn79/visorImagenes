@@ -32,7 +32,7 @@ uses
   dxLayoutContainer, cxGridViewLayoutContainer, cxGridLayoutView,
   cxGridDBLayoutView, dxmdaset, jpeg, cxImage, cxTextEdit, cxBarEditItem,
   cxCheckBox, cxMaskEdit, cxDropDownEdit, cxCheckComboBox, Vcl.ComCtrls, dxCore,
-  cxDateUtils, cxCalendar, dxBarExtItems;
+  cxDateUtils, cxCalendar, dxBarExtItems, System.Generics.Collections;
 
 type
   TfrmVisorImagenes = class(TfrmBaseGrilla)
@@ -318,23 +318,92 @@ begin
 end;
 
 procedure TfrmVisorImagenes.LeerImagenes;
-var nombreImagen: string; jpg: TJPEGImage; stream, f: TStream;
+var
+  NombreImagen: string;
+  Jpg: TJPEGImage;
+  QTipos: TFDQuery;
+  Tipos: TDictionary<Integer, string>;
+  Ids, Descripciones: string;
+  IdImagen, TotalLote: Integer;
+
+  procedure CargarLote;
+  var
+    IdActual: Integer;
+    Valor, Tipo: string;
+  begin
+    if Ids = '' then
+      Exit;
+    QTipos.Close;
+    // Los identificadores vienen de campos Integer, nunca de texto del usuario.
+    QTipos.SQL.Text :=
+      'SELECT i.IdImg, t.Descripcio FROM Img_TipoImagen i ' +
+      'INNER JOIN TTipoImg t ON t.IdTipoImg = i.IdTipoImg ' +
+      'WHERE i.IdImg IN (' + Ids + ') ORDER BY i.IdImg, i.IdTipoImg';
+    QTipos.Open;
+    while not QTipos.Eof do
+    begin
+      IdActual := QTipos.FieldByName('IdImg').AsInteger;
+      Tipo := QTipos.FieldByName('Descripcio').AsString;
+      if Tipos.TryGetValue(IdActual, Valor) then
+        Valor := Valor + '; ' + Tipo
+      else
+        Valor := Tipo;
+      Tipos.AddOrSetValue(IdActual, Valor);
+      QTipos.Next;
+    end;
+    QTipos.Close;
+    Ids := '';
+    TotalLote := 0;
+  end;
+
 begin
-  jpg := TJPEGImage.Create;
+  Tipos := TDictionary<Integer, string>.Create;
   try
-    while not memListado.Eof do begin
-      nombreImagen := DameNombreImagenTh(memListado.FieldByName('IdImg').AsInteger);
-      memListado.Edit;
-      if FileExists(nombreImagen) then begin
-        jpg.LoadFromFile(nombreImagen);
-        memListado.FieldByName('IMAGEN').Assign(jpg);
+    DM.CrearQuery(DM.ConexionGesimag, QTipos);
+    try
+      Ids := '';
+      TotalLote := 0;
+      memListado.First;
+      while not memListado.Eof do
+      begin
+        if Ids <> '' then
+          Ids := Ids + ',';
+        Ids := Ids + IntToStr(memListado.FieldByName('IdImg').AsInteger);
+        Inc(TotalLote);
+        if TotalLote >= 150 then
+          CargarLote;
+        memListado.Next;
       end;
-      memListado.FieldByName('TIPOSIMAGEN').AsString := DameTiposImagen(memListado.FieldByName('IdImg').AsInteger);
-      memListado.Post;
-      memListado.Next;
+      CargarLote;
+    finally
+      DM.DestruirQuery(QTipos);
+    end;
+
+    Jpg := TJPEGImage.Create;
+    try
+      memListado.First;
+      while not memListado.Eof do
+      begin
+        IdImagen := memListado.FieldByName('IdImg').AsInteger;
+        NombreImagen := DameNombreImagenTh(IdImagen);
+        memListado.Edit;
+        if FileExists(NombreImagen) then
+        begin
+          Jpg.LoadFromFile(NombreImagen);
+          memListado.FieldByName('IMAGEN').Assign(Jpg);
+        end;
+        if Tipos.TryGetValue(IdImagen, Descripciones) then
+          memListado.FieldByName('TIPOSIMAGEN').AsString := Descripciones
+        else
+          memListado.FieldByName('TIPOSIMAGEN').Clear;
+        memListado.Post;
+        memListado.Next;
+      end;
+    finally
+      Jpg.Free;
     end;
   finally
-    FreeAndNil(jpg);
+    Tipos.Free;
   end;
 end;
 
@@ -452,21 +521,22 @@ begin
 end;
 
 procedure TfrmVisorImagenes.btnBuscarClick(Sender: TObject);
-var puedoContinuar: Boolean;
+var
+  PuedeContinuar: Boolean;
 begin
   inherited;
-  puedoContinuar := False;
-  if((not VarIsNull(FFecCatalogDesde)) and (VarIsNull(FFecCatalogHasta))) or ((VarIsNull(FFecCatalogDesde)) and (not VarIsNull(FFecCatalogHasta))) or ((not VarIsNull(FFecCatalogDesde)) and (not VarIsNull(FFecCatalogHasta))) then
-    puedoContinuar := True;
-
-  if (puedoContinuar) and ((not VarIsNull(FFecImportaDesde)) and (VarIsNull(FFecImportaHasta))) or ((VarIsNull(FFecImportaDesde)) and (not VarIsNull(FFecImportaHasta))) or ((not VarIsNull(FFecImportaDesde)) and (not VarIsNull(FFecImportaHasta))) then
-    puedoContinuar := True;
-  if puedoContinuar then begin
+  PuedeContinuar := not VarIsNull(FFecCatalogDesde) or
+    not VarIsNull(FFecCatalogHasta) or
+    not VarIsNull(FFecImportaDesde) or
+    not VarIsNull(FFecImportaHasta);
+  if PuedeContinuar then
+  begin
     visualizarNumPac := True;
     RefrescarDatos;
-  end else begin
-    MessageDlg('Por motivos de rendimiento, es obligatorio seleccionar alguna de las fechas de Importación o Catalogación!', mtWarning, [mbOk], 0);
-  end;
+  end
+  else
+    MessageDlg('Por motivos de rendimiento, es obligatorio seleccionar alguna fecha de importacion o catalogacion.',
+      mtWarning, [mbOk], 0);
 end;
 
 procedure TfrmVisorImagenes.cbTiposImagenPropertiesChange(Sender: TObject);
