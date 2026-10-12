@@ -385,7 +385,7 @@ begin
       while not memListado.Eof do
       begin
         IdImagen := memListado.FieldByName('IdImg').AsInteger;
-        NombreImagen := DameNombreImagenTh(IdImagen);
+        NombreImagen := DameNombreImagenTh(IdImagen, memListado.FieldByName('IdPac').AsInteger);
         memListado.Edit;
         if FileExists(NombreImagen) then
         begin
@@ -581,7 +581,7 @@ begin
   DM.FImagen.idImg := dsListado.DataSet.FieldByName('IdImg').AsInteger;
   DM.FImagen.LoadFromDB;
 
-  nombreImagen  := DameNombreImagen(DM.FImagen.idImg);
+  nombreImagen  := DameNombreImagen(DM.FImagen.idImg, DM.FImagen.idPac);
   if FileExists(nombreImagen) then begin
     frmImagenPaciente := TfrmImagenPaciente.Create(Self, nombreImagen);
     try
@@ -634,8 +634,8 @@ begin
   inherited;
   if MessageDlg('¿Desea eliminar la imagen seleccionada?', mtConfirmation, [MbYes, MbNo], 0) = mrYes then begin
     DM.FImagen.idImg          := dsListado.DataSet.FieldByName('IdImg').AsInteger;
-    DM.FImagen.nombreImagen   := DameNombreImagen(DM.FImagen.idImg);
-    DM.FImagen.nombreImagenTh := DameNombreImagenTh(DM.FImagen.idImg);
+    DM.FImagen.nombreImagen   := DameNombreImagen(DM.FImagen.idImg, dsListado.DataSet.FieldByName('IdPac').AsInteger);
+    DM.FImagen.nombreImagenTh := DameNombreImagenTh(DM.FImagen.idImg, dsListado.DataSet.FieldByName('IdPac').AsInteger);
     DM.FImagen.eliminarImagen;
     RefrescarDatos;
   end;
