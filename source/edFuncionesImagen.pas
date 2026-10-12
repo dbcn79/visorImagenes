@@ -13,9 +13,9 @@ procedure CrearThumbnail(fichero, nombreImagen: string);
 function RedimensionarImagen(source: string): TBitmap;
 function GetTempDir: string;
 procedure BorrarCarpeta(const vOrigen: string);
-function LPad(pCadena: string; pLong: Word; pRelleno: string = ' '): string;
-function DameNombreImagen(idImg: Integer): string;
-function DameNombreImagenTh(idImg: Integer): string;
+function LPad(pCadena: string; pLong: Integer; pRelleno: string = ' '): string;
+function DameNombreImagen(idImg: Integer; idPac: Integer = 0): string;
+function DameNombreImagenTh(idImg: Integer; idPac: Integer = 0): string;
 
 implementation
 
@@ -110,31 +110,41 @@ begin
     raise Exception.Create('No se pudo limpiar la carpeta temporal');
 end;
 
-function LPad(pCadena: string; pLong: Word; pRelleno: string = ' '): string;
+function LPad(pCadena: string; pLong: Integer; pRelleno: string = ' '): string;
 var long: Integer;
 begin
   Result := pCadena;
   long := 0;
-  while long < pLong do begin
+  while (long < pLong) and (pRelleno <> '') do begin
     Result := pRelleno + Result;
     Inc(long);
   end;
 end;
 
-function DameNombreImagen(idImg: Integer): string;
-var dirPac, nombreImagen, extension: string;
+function DameNombreImagen(idImg: Integer; idPac: Integer): string;
+var
+  DirPac, NombreImagen: string;
 begin
-  dirPac := IncludeTrailingBackslash(LPad(DM.FPaciente.idPac.ToString, 8 - DM.FPaciente.idPac.ToString.Length, '0'));
-  nombreImagen := LPad(idImg.ToString, 8 - idImg.ToString.Length, '0');
-  Result := IncludeTrailingBackslash(DM.FrutaImagenes) + dirPac + nombreImagen + EXT_IMG;
+  if idPac <= 0 then
+    idPac := DM.FPaciente.idPac;
+  DirPac := IncludeTrailingBackslash(LPad(IntToStr(idPac),
+    8 - Length(IntToStr(idPac)), '0'));
+  NombreImagen := LPad(IntToStr(idImg), 8 - Length(IntToStr(idImg)), '0');
+  Result := IncludeTrailingBackslash(DM.FrutaImagenes) + DirPac +
+    NombreImagen + EXT_IMG;
 end;
 
-function DameNombreImagenTh(idImg: Integer): string;
-var dirPac, nombreImagen: string;
+function DameNombreImagenTh(idImg: Integer; idPac: Integer): string;
+var
+  DirPac, NombreImagen: string;
 begin
-  dirPac := IncludeTrailingBackslash(LPad(DM.FPaciente.idPac.ToString, 8 - DM.FPaciente.idPac.ToString.Length, '0'));
-  nombreImagen := LPad(idImg.ToString, 8 - idImg.ToString.Length, '0');
-  Result := IncludeTrailingBackslash(DM.FrutaImagenes) + dirPac + nombreImagen + EXT_TH_IMG;
+  if idPac <= 0 then
+    idPac := DM.FPaciente.idPac;
+  DirPac := IncludeTrailingBackslash(LPad(IntToStr(idPac),
+    8 - Length(IntToStr(idPac)), '0'));
+  NombreImagen := LPad(IntToStr(idImg), 8 - Length(IntToStr(idImg)), '0');
+  Result := IncludeTrailingBackslash(DM.FrutaImagenes) + DirPac +
+    NombreImagen + EXT_TH_IMG;
 end;
 
 end.
