@@ -722,7 +722,9 @@ begin
     if qGenerica.Active then qGenerica.Close;
     qGenerica.SQL.Clear;
   except
-    Result := False;
+    qGenerica.Free;
+    qGenerica := nil;
+    raise;
   end;
 end;
 
@@ -897,14 +899,7 @@ begin
       qPaciente.ParamByName('FecNacim').DataType := ftDate;
     end;
     qPaciente.ParamByName('Sexo').AsString := sexo;
-    try
-      qPaciente.ExecSQL;
-    except
-      on E: Exception do begin
-        MessageDlg('Error a la hora de insertar el paciente ' + nombre + ' ' + apellidos + ' [' + E.Message + ']', mtError, [mbOk], 0);
-      end;
-
-    end;
+    qPaciente.ExecSQL;
   finally
     DM.DestruirQuery(qPaciente);
   end;
