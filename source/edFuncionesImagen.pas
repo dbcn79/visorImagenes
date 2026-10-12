@@ -3,7 +3,7 @@ unit edFuncionesImagen;
 interface
 
 uses Winapi.Windows, System.SysUtils, System.Classes, Vcl.Forms, Data, Vcl.Imaging.jpeg,
-  Vcl.Graphics, Winapi.ShlObj, System.Masks, Winapi.ShellApi;
+  Vcl.Graphics, Winapi.ShlObj, System.Masks, Winapi.ShellApi, System.Math;
 
 const
   EXT_IMG = '.jpg';
@@ -20,15 +20,21 @@ function DameNombreImagenTh(idImg: Integer): string;
 implementation
 
 procedure CrearThumbnail(fichero, nombreImagen: string);
-var jpgImage: TJPEGImage; bitmap: TBitMap;
+var
+  jpgImage: TJPEGImage;
+  bitmap: TBitmap;
 begin
   bitmap := RedimensionarImagen(fichero);
-  jpgImage := TJPEGImage.Create;
   try
-  jpgImage.Assign(bitmap);
-  jpgImage.SaveToFile(nombreImagen);
+    jpgImage := TJPEGImage.Create;
+    try
+      jpgImage.Assign(bitmap);
+      jpgImage.SaveToFile(nombreImagen);
+    finally
+      jpgImage.Free;
+    end;
   finally
-    jpgImage.Free;
+    bitmap.Free;
   end;
 end;
 
@@ -45,11 +51,16 @@ begin
         Result.PixelFormat := TBitmap(Pic.Graphic).PixelFormat
       else
         Result.PixelFormat := pf32bit;
-      if Pic.Width > Pic.Height then begin
+      if (Pic.Width <= 0) or (Pic.Height <= 0) then
+        raise EInvalidGraphic.Create('La imagen no tiene dimensiones validas');
+      if Pic.Width >= Pic.Height then
+      begin
         Result.Width := 90;
-        Result.Height := 60;
-      end else begin
-        Result.Width := 65;
+        Result.Height := Max(1, MulDiv(Pic.Height, 90, Pic.Width));
+      end
+      else
+      begin
+        Result.Width := Max(1, MulDiv(Pic.Width, 90, Pic.Height));
         Result.Height := 90;
       end;
       Result.Canvas.StretchDraw(Rect(0, 0, Result.Width, Result.Height), Pic.Graphic);
@@ -72,24 +83,28 @@ begin
 end;
 
 procedure BorrarCarpeta(const vOrigen: string);
-var vCarpetas: TSHFileOpStruct;
+var
+  vCarpetas: TSHFileOpStruct;
+  Origen: string;
+  Carpeta: string;
 begin
-  // Inicializamos la variable vCarpetas
-  FillChar(vCarpetas, SizeOf(vCarpetas), #0);
+  if Trim(vOrigen) = '' then
+    Exit;
+  Carpeta := ExpandFileName(ExcludeTrailingPathDelimiter(vOrigen));
+  if not DirectoryExists(Carpeta) then
+    Exit;
+  if not SameText(Copy(Carpeta, 1, Length(IncludeTrailingPathDelimiter(GetTempDir))),
+                  IncludeTrailingPathDelimiter(GetTempDir)) then
+    raise Exception.Create('Solo se pueden limpiar carpetas temporales');
 
-  // Preparamos las propiedades de vCarpetas para borrar
+  FillChar(vCarpetas, SizeOf(vCarpetas), 0);
+  Origen := Carpeta + #0#0; // Buffer de doble terminacion NUL.
   vCarpetas.wFunc := FO_DELETE;
   vCarpetas.Wnd := GetDesktopWindow;
-  vCarpetas.pFrom := PChar(vOrigen + #0#0);
-
-  // Cargamos las banderas de
-  // FOF_NOCONFIRMATION -> no pide confirmación para copiar
-  // FOF_SILENT -> no muestra el dialogo de progreso
-  // FOF_ALLOWUNDO -> preserva la información para deshacer, si es posible
-  vCarpetas.fFlags := FOF_NOCONFIRMATION or FOF_SILENT or FOF_ALLOWUNDO;
-
-  // Ejecutamos el proceso con ShFileOperation y si devuelve 0, la operación es un éxito
-  ShFileOperation(vCarpetas);
+  vCarpetas.pFrom := PChar(Origen);
+  vCarpetas.fFlags := FOF_NOCONFIRMATION or FOF_SILENT;
+  if ShFileOperation(vCarpetas) <> 0 then
+    raise Exception.Create('No se pudo limpiar la carpeta temporal');
 end;
 
 function LPad(pCadena: string; pLong: Word; pRelleno: string = ' '): string;
