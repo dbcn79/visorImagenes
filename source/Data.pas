@@ -16,9 +16,6 @@ uses
 
 const
   // Password encriptado utilizandose como clave
-  KEY              = 'xgXq6SJBu/wM5hg=';      // Nuestro password
-  KEY_GKC          = 'NOLYBAB/KBO';           // KEY para la encriptación de los ficheros GKC
-  PASSSWORD_SA     = 'NEWYORK1930';
   ID_ESTOMATOLOGIA = 19;
 
   SQL_ZONA         = 'SELECT IdZona Codigo, Descripcio FROM TZona WHERE ISNULL(Activo, 1) = 1 ORDER BY Descripcio';
@@ -216,6 +213,7 @@ end;
 procedure TDM.DataModuleDestroy(Sender: TObject);
 begin
   FPaciente.Free;
+  FImagen.Free;
   FinstanciasCreadas.Clear;
   FreeAndNil(FinstanciasCreadas);
 end;
@@ -224,21 +222,26 @@ end;
 procedure TDM.ParametrizacionServicio;
 var
   IniFile: TIniFile;
+  PasswordCifrado: string;
 begin
   IniFile := TIniFile.Create(ExtractFilePath(Application.ExeName) + 'Visorimagenes.config');
   try
-    // Recogemos los valores del GKC
     Fservidor     := IniFile.ReadString('SITE', 'Server', '');
     FbaseDatos    := IniFile.ReadString('SITE', 'BBDD', '');
     Fusuario      := IniFile.ReadString('SITE', 'Login', '');
-    Fpassword     := IniFile.ReadString('SITE', 'Password', '');
     FrutaImagenes := IniFile.ReadString('SITE', 'IMG', '');
-    FrutaImagenes := IncludeTrailingBackslash(ExtractFilePath(Application.ExeName)) + FrutaImagenes;
+    FrutaImagenes := ExpandFileName(ExtractFilePath(Application.ExeName) + FrutaImagenes);
 
-    if Fpassword <> '' then begin
-      Fpassword  := DesencriptaStr(Fpassword);
-    end else begin
-      Fpassword := PASSSWORD_SA;
+    // Nunca almacenar ni utilizar credenciales predeterminadas en el codigo.
+    // La variable de entorno tiene prioridad sobre el antiguo INI cifrado.
+    Fpassword := GetEnvironmentVariable('VISORIMAGENES_DB_PASSWORD');
+    if (Fpassword = '') and
+       not SameText(GetEnvironmentVariable('VISORIMAGENES_DB_AUTH'), 'windows') then
+    begin
+      PasswordCifrado := IniFile.ReadString('SITE', 'Password', '');
+      if (PasswordCifrado <> '') and
+         (GetEnvironmentVariable('VISORIMAGENES_GKC_KEY') <> '') then
+        Fpassword := string(DesencriptaStr(AnsiString(PasswordCifrado)));
     end;
   finally
     IniFile.Free;
@@ -248,17 +251,31 @@ end;
 
 {$region 'CONEXION BASE DE DATOS'}
 function TDM.ConectarBaseDatosGesimag: Boolean;
+var
+  AutenticacionWindows: Boolean;
 begin
   Result := False;
+  AutenticacionWindows := SameText(GetEnvironmentVariable('VISORIMAGENES_DB_AUTH'), 'windows');
+  if not AutenticacionWindows and (Fpassword = '') then
+  begin
+    MessageDlg('Falta configurar VISORIMAGENES_DB_PASSWORD o VISORIMAGENES_DB_AUTH=windows.',
+      mtError, [mbOk], 0);
+    Exit;
+  end;
 
-  ConexionGesimag.Connected:= False;
+  ConexionGesimag.Connected := False;
   ConexionGesimag.Params.Clear;
   ConexionGesimag.Params.Add('DriverId=GESIMAG');
   ConexionGesimag.Params.Add('Server=' + Fservidor);
   ConexionGesimag.Params.Add('Database=' + FbaseDatos);
-  ConexionGesimag.Params.Add('OSAuthent=No');
-  ConexionGesimag.Params.Add('User_Name=' + Fusuario);
-  ConexionGesimag.Params.Add('Password=' + Fpassword);
+  if AutenticacionWindows then
+    ConexionGesimag.Params.Add('OSAuthent=Yes')
+  else
+  begin
+    ConexionGesimag.Params.Add('OSAuthent=No');
+    ConexionGesimag.Params.Add('User_Name=' + Fusuario);
+    ConexionGesimag.Params.Add('Password=' + Fpassword);
+  end;
   ConexionGesimag.Params.Add('MetaDefSchema=dbo');
   ConexionGesimag.Params.Add('MetaDefCatalog=' + FbaseDatos);
   try
@@ -266,7 +283,8 @@ begin
     Result := True;
   except
     on E: Exception do
-      MessageDlg('ERROR: No se pudo establecer conexión con la base de datos ' + FbaseDatos + ' (' + E.Message + ')', mtError, [mbOk], 0);
+      MessageDlg('No se pudo conectar con la base de datos (' + E.Message + ')',
+        mtError, [mbOk], 0);
   end;
 end;
 
@@ -281,14 +299,19 @@ end;
 
 {$region 'DESENCRIPTACION'}
 procedure TDM.SetKeyGKC;
+var
+  Clave: string;
 begin
-  // Establecemos la clave de encriptación/desencriptación para el fichero GKC
-  Cipher.InitKey(KEY_GKC, nil);
+  // Solo para migrar configuraciones existentes: la clave nunca se distribuye en el EXE.
+  Clave := GetEnvironmentVariable('VISORIMAGENES_GKC_KEY');
+  if Clave = '' then
+    raise EInvalidOpException.Create('Falta VISORIMAGENES_GKC_KEY');
+  Cipher.InitKey(AnsiString(Clave), nil);
 end;
 
 procedure TDM.SetKey(inKey: Ansistring);
 begin
-  // Establecemos la clave de encriptación/desencriptación
+  // Establecemos la clave de encriptaciÃ³n/desencriptaciÃ³n
   Cipher.InitKey(inKey, nil);
 end;
 
@@ -498,7 +521,7 @@ begin
 
     parQuery.SQL.Clear;
     parQuery.SQL.Text := parSQL;
-    // En caso que hayan parámetros, pasámos el parámetro y su valor
+    // En caso que hayan parÃ¡metros, pasÃ¡mos el parÃ¡metro y su valor
     for i := Low(parColParams) to High(parColParams) do begin
       if (Assigned(parQuery.Params.FindParam(parColParams[i]))) then
         parQuery.ParamByName(parColParams[i]).Value := parColParamsValue[i];
@@ -514,7 +537,7 @@ begin
       end;
       parVista.DataController.KeyFieldNames := 'CODIGO';
       parVista.DataController.CreateAllItems;
-      // Añadimos las columnas
+      // AÃ±adimos las columnas
 
       //VPA, ANTES DEBERIAMOS OCULATARLAS TODAS NO?
       GrillaOcultaColumnes(parVista);
@@ -561,16 +584,25 @@ end;
 
 function TDM.DameCodigosSeleccionados(parCheckComboBox: TcxCheckComboBox): Variant;
 var
-  AFieldValue: string;
+  AFieldValue, Valor: string;
   IndicesArray: TArray<string>;
-  i: Integer;
+  i, Indice: Integer;
 begin
   Result := Null;
-  IndicesArray := AnsiReplaceStr(parCheckComboBox.EditingValue, ';', '').Split([',']);
-  if Assigned(IndicesArray) then begin
-    AFieldValue := IntToStr(parCheckComboBox.Properties.Items[StrToInt(IndicesArray[0])].Tag);
-    for i := 1 to length(IndicesArray) - 1 do
-      AFieldValue := AFieldValue + ', ' + IntToStr(parCheckComboBox.Properties.Items[StrToInt(IndicesArray[i])].Tag);
+  AFieldValue := '';
+  Valor := Trim(AnsiReplaceStr(VarToStr(parCheckComboBox.EditingValue), ';', ''));
+  if Valor = '' then
+    Exit;
+
+  IndicesArray := Valor.Split([',']);
+  for i := 0 to Length(IndicesArray) - 1 do
+  begin
+    if not TryStrToInt(Trim(IndicesArray[i]), Indice) or
+       (Indice < 0) or (Indice >= parCheckComboBox.Properties.Items.Count) then
+      raise EConvertError.Create('Seleccion de tipo de imagen no valida');
+    if AFieldValue <> '' then
+      AFieldValue := AFieldValue + ', ';
+    AFieldValue := AFieldValue + IntToStr(parCheckComboBox.Properties.Items[Indice].Tag);
   end;
   if AFieldValue <> '' then
     Result := AFieldValue;
@@ -796,7 +828,8 @@ begin
     DM.qrySEL.SQL.Clear;
     DM.qrySEL.SQL.Add('SELECT NumPac, Nombre, Apellidos, Direccion, CP, FecNacim, Poblacion, Provincia, TelPrivado, TelTrabajo, Sexo');
     DM.qrySEL.SQL.Add('  FROM Paciente');
-    DM.qrySEL.SQL.Add(' WHERE IdPac = ' + idPac.ToString);
+    DM.qrySEL.SQL.Add(' WHERE IdPac = :IdPac');
+    DM.qrySEL.ParamByName('IdPac').AsInteger := idPac;
     DM.qrySEL.Open;
 
     if not DM.qrySEL.IsEmpty then begin
@@ -932,7 +965,8 @@ begin
     DM.qrySEL.SQL.Add('from img i');
     DM.qrySEL.SQL.Add('  left join Paciente p on p.IdPac = i.IdPac');
     DM.qrySEL.SQL.Add('  left join TFuente f on f.IdFuente = i.IdFuente');
-    DM.qrySEL.SQL.Add('where i.IdImg = ' + idImg.ToString);
+    DM.qrySEL.SQL.Add('where i.IdImg = :IdImg');
+    DM.qrySEL.ParamByName('IdImg').AsInteger := idImg;
     DM.qrySEL.Open;
 
     if not DM.qrySEL.IsEmpty then begin
@@ -972,7 +1006,7 @@ begin
   end;
   // Eliminamos los antiguos tipos de imagen asociados
   eliminarTiposImagen;
-  // Si hay algún tipo de imagen asociado lo grabamos
+  // Si hay algÃºn tipo de imagen asociado lo grabamos
   if lstTiposImagen.Count > 0 then
     GuardarTiposImagen;
 end;
