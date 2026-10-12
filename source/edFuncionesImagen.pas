@@ -77,8 +77,11 @@ function GetTempDir: string;
 var Buffer: Array[0..Max_path] of char;
 begin
   FillChar(Buffer,Max_Path + 1, 0);
-  GetTempPath(Max_path, Buffer);
+  if GetTempPath(Max_path, Buffer) = 0 then
+    RaiseLastOSError;
   Result := String(Buffer);
+  if Result = '' then
+    raise Exception.Create('No se pudo localizar la carpeta temporal');
   if Result[Length(Result)] <> '\' then Result := Result + '\';
 end;
 
