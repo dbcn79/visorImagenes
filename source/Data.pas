@@ -1000,15 +1000,22 @@ end;
 
 procedure TImagen.GuardarImagen;
 begin
-  case DM.FEstadoImagen of
-    eiInsertar: insertarImagen;
-    eiEditar  : editarImagen;
+  // Una unica transaccion para la imagen y sus tipos asociados.
+  DM.ConexionGesimag.StartTransaction;
+  try
+    case DM.FEstadoImagen of
+      eiInsertar: insertarImagen;
+      eiEditar  : editarImagen;
+    end;
+    eliminarTiposImagen;
+    if lstTiposImagen.Count > 0 then
+      guardarTiposImagen;
+    DM.ConexionGesimag.Commit;
+  except
+    if DM.ConexionGesimag.InTransaction then
+      DM.ConexionGesimag.Rollback;
+    raise;
   end;
-  // Eliminamos los antiguos tipos de imagen asociados
-  eliminarTiposImagen;
-  // Si hay algún tipo de imagen asociado lo grabamos
-  if lstTiposImagen.Count > 0 then
-    GuardarTiposImagen;
 end;
 
 procedure TImagen.insertarImagen;
@@ -1080,15 +1087,10 @@ begin
     qImagen.ParamByName('id_cataleg').Value    := DM.FPaciente.idPac;
     qImagen.ParamByName('IdCompres').Value     := idCompres;
     qImagen.ParamByName('IdUsu').Value         := idUsu;
-    try
-      qImagen.ExecSQL;
+    qImagen.ExecSQL;
 
-      // Generamos la imagen y el thumbnail
-      GenerarImagen;
-    except
-      on E: Exception do
-        MessageDlg('Error a la hora de insertar la imagen [' + E.Message + ']', mtError, [mbOk], 0);
-    end;
+    // Si falla la conversion, la transaccion de la base de datos se revierte.
+    GenerarImagen;
   finally
     DM.DestruirQuery(qImagen);
   end;
@@ -1101,10 +1103,12 @@ begin
   try
     img.Picture.LoadFromFile(nombreImagenTemporal);
     nombreImagen := DameNombreImagen(idImg);
+    if not ForceDirectories(ExtractFilePath(nombreImagen)) then
+      raise Exception.Create('No se pudo crear el directorio de imagenes');
     img.Picture.SaveToFile(nombreImagen);
     nombreImagenTh := DameNombreImagenTh(idImg);
     CrearThumbnail(nombreImagen, nombreImagenTh);
-    DeleteFile(PChar(nombreImagenTemporal));
+    // El fichero de origen es propiedad del usuario: no borrarlo.
     nombreImagenTemporal := '';
   finally
     img.Free;
@@ -1145,39 +1149,41 @@ begin
     qImagen.ParamByName('Piezas').Value        := piezas;
     qImagen.ParamByName('IdEspec').Value       := idEspec;
     qImagen.ParamByName('IdImg').Value         := idImg;
-    try
-      qImagen.ExecSQL;
-    except
-      on E: Exception do
-        MessageDlg('Error a la hora de modificar la imagen [' + E.Message + ']', mtError, [mbOk], 0);
-    end;
+    qImagen.ExecSQL;
   finally
     DM.DestruirQuery(qImagen);
   end;
 end;
 
 procedure TImagen.eliminarImagen;
-var qImagen: TFDQuery;
+var
+  qImagen: TFDQuery;
 begin
-  // Primero eliminamos los tipos de imagen
-  eliminarTiposImagen;
-
-  DM.CrearQuery(DM.ConexionGesimag, qImagen);
+  // Primero completar el borrado SQL. Nunca borrar archivos si falla la BD.
+  DM.ConexionGesimag.StartTransaction;
   try
-    qImagen.SQL.Add('DELETE FROM Img');
-    qImagen.SQL.Add(' WHERE IdImg       = :IdImg');
-    qImagen.ParamByName('IdImg').Value := idImg;
+    eliminarTiposImagen;
+    DM.CrearQuery(DM.ConexionGesimag, qImagen);
     try
+      qImagen.SQL.Add('DELETE FROM Img WHERE IdImg = :IdImg');
+      qImagen.ParamByName('IdImg').AsInteger := idImg;
       qImagen.ExecSQL;
-      DeleteFile(PChar(nombreImagen));
-      DeleteFile(PChar(nombreImagenTh));
-    except
-      on E: Exception do
-        MessageDlg('Error a la hora de eliminar la imagen [' + E.Message + ']', mtError, [mbOk], 0);
+    finally
+      DM.DestruirQuery(qImagen);
     end;
-  finally
-    DM.DestruirQuery(qImagen);
+    DM.ConexionGesimag.Commit;
+  except
+    if DM.ConexionGesimag.InTransaction then
+      DM.ConexionGesimag.Rollback;
+    raise;
   end;
+
+  // Solo rutas calculadas dentro de la carpeta de imagenes.
+  // Un fallo del sistema de archivos debe notificarse para su recuperacion.
+  if FileExists(nombreImagen) and not DeleteFile(nombreImagen) then
+    raise Exception.Create('Se elimino el registro pero no el archivo de imagen: ' + nombreImagen);
+  if FileExists(nombreImagenTh) and not DeleteFile(nombreImagenTh) then
+    raise Exception.Create('Se elimino el registro pero no su miniatura: ' + nombreImagenTh);
 end;
 
 procedure TImagen.eliminarTiposImagen;
@@ -1185,7 +1191,8 @@ var qTiposImagen: TFDQuery;
 begin
   DM.CrearQuery(DM.ConexionGesimag, qTiposImagen);
   try
-    qTiposImagen.SQL.Add('DELETE FROM Img_TipoImagen WHERE IdImg = ' + idImg.ToString);
+    qTiposImagen.SQL.Add('DELETE FROM Img_TipoImagen WHERE IdImg = :IdImg');
+    qTiposImagen.ParamByName('IdImg').AsInteger := idImg;
     qTiposImagen.ExecSQL;
   finally
     DM.DestruirQuery(qTiposImagen);
@@ -1215,7 +1222,8 @@ begin
   try
     qTiposImagen.SQL.Add('SELECT IdTipoImg');
     qTiposImagen.SQL.Add('  FROM Img_TipoImagen');
-    qTiposImagen.SQL.Add(' WHERE IdImg = ' + idImg.ToString);
+    qTiposImagen.SQL.Add(' WHERE IdImg = :IdImg');
+    qTiposImagen.ParamByName('IdImg').AsInteger := idImg;
     qTiposImagen.Open;
 
     lstTiposImagen.Clear;
